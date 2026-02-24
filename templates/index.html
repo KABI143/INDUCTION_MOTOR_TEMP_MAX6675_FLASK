@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Induction Motor Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: white;
+        }
+
+        /* ===== HEADER BAR ===== */
+        .topbar {
+            background: #1e293b;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .temp-display {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .status {
+            margin-top: 5px;
+            font-weight: bold;
+        }
+
+        select, button {
+            padding: 6px 10px;
+            margin-left: 5px;
+            border-radius: 5px;
+        }
+
+        .connect {
+            background: #2563eb;
+            color: white;
+            border: none;
+        }
+
+        .disconnect {
+            background: orange;
+            color: white;
+            border: none;
+        }
+
+        .start {
+            background: green;
+            color: white;
+            border: none;
+        }
+
+        .stop {
+            background: red;
+            color: white;
+            border: none;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            flex-wrap: wrap;
+        }
+
+        .panel {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 400px;
+        }
+
+        #serialBox {
+            background: black;
+            height: 300px;
+            overflow: auto;
+            font-family: monospace;
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            background: #1e293b;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ===== TOP CONTROL BAR ===== -->
+<div class="topbar">
+
+    <div>
+        <div class="temp-display">
+            🌡 Live Temperature: {{ temp }} °C
+        </div>
+
+        <div class="status">
+            Status:
+            <span id="connectionStatus"
+                style="color:{% if status == 'Connected' %}lime{% else %}red{% endif %};">
+                ● {{ status }}
+            </span>
+        </div>
+    </div>
+
+    <div>
+        <form method="POST" style="display:inline;">
+            Select COM Port:
+            <select name="port">
+                {% for port in ports %}
+                <option value="{{ port }}">{{ port }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="connect">
+                Connect
+            </button>
+        </form>
+
+        <a href="/disconnect">
+            <button class="disconnect">
+                Disconnect
+            </button>
+        </a>
+
+        <a href="/start_logging">
+            <button class="start">Start Logging</button>
+        </a>
+
+        <a href="/stop_logging">
+            <button class="stop">Stop Logging</button>
+        </a>
+    </div>
+
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<div class="main">
+
+    <!-- Graph Panel -->
+    <div class="panel">
+        <h3>Temperature Graph</h3>
+        <canvas id="tempChart"></canvas>
+    </div>
+
+    <!-- Serial Monitor Panel -->
+    <div class="panel">
+        <h3>Live Serial Data</h3>
+        <div id="serialBox"></div>
+    </div>
+
+</div>
+
+<footer>
+    Induction Motor Temperature Monitoring System | Local USB Logger
+</footer>
+
+<script>
+const ctx = document.getElementById('tempChart').getContext('2d');
+
+let chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Temperature (°C)',
+            data: [],
+            borderColor: 'orange',
+            borderWidth: 2,
+            fill: false
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            x: { ticks: { color: "white" } },
+            y: { ticks: { color: "white" } }
+        },
+        plugins: {
+            legend: {
+                labels: { color: "white" }
+            }
+        }
+    }
+});
+
+function updateChart() {
+    fetch('/data')
+        .then(response => response.json())
+        .then(data => {
+            chart.data.labels = data.map(d => d.time);
+            chart.data.datasets[0].data = data.map(d => d.temp);
+            chart.update();
+        });
+}
+
+function updateSerial() {
+    fetch('/serial_data')
+        .then(response => response.json())
+        .then(data => {
+            let box = document.getElementById("serialBox");
+            box.innerHTML = data.join("<br>");
+            box.scrollTop = box.scrollHeight;
+        });
+}
+
+/* ===== AUTO STATUS UPDATE WITHOUT PAGE REFRESH ===== */
+function updateStatus(){
+    fetch('/status')
+        .then(response => response.json())
+        .then(data => {
+            let el = document.getElementById("connectionStatus");
+
+            if(data.status === "Connected"){
+                el.innerHTML = "● Connected";
+                el.style.color = "lime";
+            } else {
+                el.innerHTML = "● Not Connected";
+                el.style.color = "red";
+            }
+        });
+}
+
+setInterval(updateChart, 2000);
+setInterval(updateSerial, 1000);
+setInterval(updateStatus, 2000);
+</script>
+
+</body>
+</html>
